@@ -1,54 +1,117 @@
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.Socket;
-import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 
 public class Client {
-    static final String severHost = "localhost";
+    static final String SERVERHOST = "localhost";
+    static final int PORT = 9999;
+
+    private byte[] reverse(byte[] bytes) {
+        int i;
+        byte t;
+        int n = bytes.length;
+        for (i = 0; i < n / 2; i++) {
+            t = bytes[i];
+            bytes[i] = bytes[n - i - 1];
+            bytes[n - i - 1] = t;
+        }
+        return bytes;
+    }
+
+    private int fromByteArray(byte[] bytes) {
+        reverse(bytes);
+        return bytes[0] << 24 | (bytes[1] & 0xFF) << 16 | (bytes[2] & 0xFF) << 8 | (bytes[3] & 0xFF);
+    }
+
+    private final byte[] intToByteArray(int value) {
+        return new byte[] { (byte) (value >>> 24), (byte) (value >>> 16), (byte) (value >>> 8), (byte) value };
+    }
+
+    private Byte[] toObjects(byte[] bytesPrim) {
+        Byte[] bytes = new Byte[bytesPrim.length];
+        Arrays.setAll(bytes, n -> bytesPrim[n]);
+        return bytes;
+    }
+
+    private byte[] toPrimitives(Object[] objects) {
+        byte[] bytes = new byte[objects.length];
+        for (int i = 0; i < objects.length; i++)
+            bytes[i] = (Byte) objects[i];
+        return bytes;
+    }
+
+    private void addPayload(ArrayList<Byte> sendPayload, int value) {
+        sendPayload.addAll(Arrays.asList(toObjects(reverse(intToByteArray(value)))));
+    }
+
+    private void addPayload(ArrayList<Byte> sendPayload, String value) {
+        sendPayload.addAll(Arrays.asList(toObjects(value.getBytes(StandardCharsets.UTF_8))));
+    }
+
+    public void write(Socket socket, int type, int len) throws IOException {
+        write(socket, type, len, "");
+    }
+
+    public void write(Socket socket, int type, int len, ArrayList<Integer> data) throws IOException {
+        ArrayList<Byte> sendPayload = new ArrayList<>();
+        addPayload(sendPayload, type);
+        addPayload(sendPayload, len * 4);
+        for (int i = 0; i < len; i++) {
+            addPayload(sendPayload, data.get(i));
+        }
+        write(socket.getOutputStream(), sendPayload);
+    }
+
+    public void write(Socket socket, int type, int len, String data) throws IOException {
+        ArrayList<Byte> sendPayload = new ArrayList<>();
+        addPayload(sendPayload, type);
+        addPayload(sendPayload, len);
+        if (len > 0) {
+            addPayload(sendPayload, data);
+        }
+        write(socket.getOutputStream(), sendPayload);
+    }
+
+    private void write(OutputStream outputStream, ArrayList<Byte> sendPayload) throws IOException {
+        outputStream.write(toPrimitives(sendPayload.toArray()));
+        outputStream.flush();
+    }
+
     public static void main(String[] args) {
+        Client client = new Client();
         Socket socketOfClient;
-        DataInputStream ip;
-        DataOutputStream op;
         try {
-            socketOfClient = new Socket(severHost, 9999);
-            ip = new DataInputStream(socketOfClient.getInputStream());
-            op = new DataOutputStream(socketOfClient.getOutputStream());
-
-            op.writeInt(0);
-            op.writeInt(8);
-            op.writeUTF("20020325");
-            op.flush();
-
-            int type = ip.readInt();
-            int len = ip.readInt();
-            ArrayList<Integer> arr = new ArrayList<>();
-            int res = 0;
-            for(int i = 0;i<len;i++){
-                arr.add(ip.readInt());
-                res += arr.get(i);
+            socketOfClient = new Socket(SERVERHOST, PORT);
+            String msv = "20020005";
+            client.write(socketOfClient, 0, msv.length(), msv);
+            byte[] payload = new byte[50];
+            socketOfClient.getInputStream().read(payload);
+            byte[] typeByte = new byte[4];
+            byte[] lenByte = new byte[4];
+            int type, len;
+            ArrayList<Integer> dataPayload = new ArrayList<>();
+            System.out.println(Arrays.toString(payload));
+            typeByte = Arrays.copyOfRange(payload, 0, 4);
+            lenByte = Arrays.copyOfRange(payload, 4, 8);
+            type = client.fromByteArray(typeByte);
+            len = client.fromByteArray(lenByte);
+            for (int i = 0; i < len / 4; i++) {
+                byte[] tg = Arrays.copyOfRange(payload, 8 + i * 4, 12 + i * 4);
+                dataPayload.add(client.fromByteArray(tg));
             }
-            System.out.println("Type "+type);
-            System.out.println("len "+len);
-            System.out.println(Arrays.toString(Arrays.stream(arr.toArray()).toArray()));
+            System.out.println(dataPayload.toString());
+            ArrayList<Integer> res = new ArrayList<>();
+            res.add(dataPayload.get(0) + dataPayload.get(1));
+            client.write(socketOfClient, 2, res.size(), res);
 
-            op.writeInt(2);
-            op.writeInt(1);
-            op.writeInt(res);
-            op.flush();
-
-            type = ip.readInt();
-            if(type == 3) {
-                System.out.println("end");
-            }
-            if(type == 4){
-                len = ip.readInt();
-                String flag = ip.readUTF();
-                System.out.println("Flag: "+flag);
-            }
+            payload = new byte[100];
+            socketOfClient.getInputStream().read(payload);
+            len = client.fromByteArray(Arrays.copyOfRange(payload, 4, 8));
+            String flag = new String(Arrays.copyOfRange(payload, 8, 8 + len), StandardCharsets.UTF_8);
+            System.out.println("Flag: " + flag);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
