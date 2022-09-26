@@ -71,7 +71,7 @@ public class sever {
         outputStream.flush();
     }
 
-    public static void xl() {
+    public static void process() {
         ServerSocket sever = null;
         Socket socket = null;
         byte[] payload;
@@ -152,6 +152,6 @@ public class sever {
     }
 
     public static void main(String[] args) {
-
+        process();
     }
 }
