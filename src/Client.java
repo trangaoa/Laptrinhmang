@@ -4,6 +4,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 
 public class Client {
     static final String SERVERHOST = "localhost";
@@ -27,7 +28,10 @@ public class Client {
     }
 
     private final byte[] intToByteArray(int value) {
-        return new byte[] { (byte) (value >>> 24), (byte) (value >>> 16), (byte) (value >>> 8), (byte) value };
+        byte[] res;
+        res = new byte[] { (byte) (value >>> 24), (byte) (value >>> 16), (byte) (value >>> 8), (byte) value };
+        // reverse(res);
+        return res;
     }
 
     private Byte[] toObjects(byte[] bytesPrim) {
@@ -80,6 +84,33 @@ public class Client {
         outputStream.flush();
     }
 
+    private int partition(int arr[], int low, int high) {
+        int pivot = arr[high];
+        int i = low - 1;
+        for (int j = low; j < high; j++) {
+            if (arr[j] < pivot) {
+                i++;
+                int temp = arr[i];
+                arr[i] = arr[j];
+                arr[j] = temp;
+            }
+        }
+        int temp = arr[i + 1];
+        arr[i + 1] = arr[high];
+        arr[high] = temp;
+
+        return i + 1;
+    }
+
+    void sort(int arr[], int low, int high) {
+        if (low < high) {
+
+            int pi = partition(arr, low, high);
+            sort(arr, low, pi - 1);
+            sort(arr, pi + 1, high);
+        }
+    }
+
     public static void main(String[] args) {
         Client client = new Client();
         Socket socketOfClient;
@@ -87,30 +118,40 @@ public class Client {
             socketOfClient = new Socket(SERVERHOST, PORT);
             String msv = "20020005";
             client.write(socketOfClient, 0, msv.length(), msv);
-            byte[] payload = new byte[50];
+            byte[] payload = new byte[500];
             socketOfClient.getInputStream().read(payload);
             byte[] typeByte = new byte[4];
             byte[] lenByte = new byte[4];
             int type, len;
             ArrayList<Integer> dataPayload = new ArrayList<>();
-            System.out.println(Arrays.toString(payload));
+            // System.out.println("Payload: " + Arrays.toString(payload));
             typeByte = Arrays.copyOfRange(payload, 0, 4);
             lenByte = Arrays.copyOfRange(payload, 4, 8);
             type = client.fromByteArray(typeByte);
             len = client.fromByteArray(lenByte);
-            for (int i = 0; i < len / 4; i++) {
-                byte[] tg = Arrays.copyOfRange(payload, 8 + i * 4, 12 + i * 4);
+            // System.out.println(len);
+            // System.out.println("Payload: " + payload);
+            for (int i = 8; i < len + 8; i += 4) {
+                byte[] tg = Arrays.copyOfRange(payload, i, i + 4);
                 dataPayload.add(client.fromByteArray(tg));
             }
-            System.out.println(dataPayload.toString());
-            ArrayList<Integer> res = new ArrayList<>();
-            res.add(dataPayload.get(0) + dataPayload.get(1));
-            client.write(socketOfClient, 2, res.size(), res);
+            Collections.sort(dataPayload);
+            // dataPayload.add(3);
+            // System.out.println(dataPayload.toString());
+            // ArrayList<Integer> res = new ArrayList<>();
+            // res.add(dataPayload.get(0) + dataPayload.get(1));
+            client.write(socketOfClient, 2, dataPayload.size(), dataPayload);
 
             payload = new byte[100];
             socketOfClient.getInputStream().read(payload);
+            type = client.fromByteArray(Arrays.copyOfRange(payload, 0, 4));
+            if (type == 3) {
+                System.out.println("err");
+                return;
+            }
             len = client.fromByteArray(Arrays.copyOfRange(payload, 4, 8));
-            String flag = new String(Arrays.copyOfRange(payload, 8, 8 + len), StandardCharsets.UTF_8);
+            String flag = new String(Arrays.copyOfRange(payload, 8, 8 + len),
+                    StandardCharsets.UTF_8);
             System.out.println("Flag: " + flag);
         } catch (IOException e) {
             throw new RuntimeException(e);

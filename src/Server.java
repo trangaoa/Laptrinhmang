@@ -1,11 +1,11 @@
-import java.io.*;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
-import java.lang.Object;
 
 public class Server {
     private final static int PORT = 9999;
@@ -28,18 +28,14 @@ public class Server {
     }
 
     private boolean check(ArrayList<Integer> a, ArrayList<Integer> b) {
-        if (a.size() != b.size())
-            return false;
-        for (int i = 0; i < a.size(); i++) {
-            if (a.get(i) != b.get(i)) {
-                return false;
-            }
-        }
-        return true;
+        return a.equals(b);
     }
 
     private final byte[] intToByteArray(int value) {
-        return new byte[] { (byte) (value >>> 24), (byte) (value >>> 16), (byte) (value >>> 8), (byte) value };
+        byte[] res;
+        res = new byte[] { (byte) (value >>> 24), (byte) (value >>> 16), (byte) (value >>> 8), (byte) value };
+        // reverse(res);
+        return res;
     }
 
     private Byte[] toObjects(byte[] bytesPrim) {
@@ -83,6 +79,7 @@ public class Server {
     }
 
     public void write(Socket socket, int type, int len, ArrayList<Integer> data) throws IOException {
+        System.out.println(type);
         ArrayList<Byte> sendPayload = new ArrayList<>();
         addPayload(sendPayload, type);
         addPayload(sendPayload, len * 4);
@@ -93,6 +90,7 @@ public class Server {
     }
 
     public void write(Socket socket, int type, int len, String data) throws IOException {
+        System.out.println(type);
         ArrayList<Byte> sendPayload = new ArrayList<>();
         addPayload(sendPayload, type);
         addPayload(sendPayload, len);
@@ -103,6 +101,7 @@ public class Server {
     }
 
     private void write(OutputStream outputStream, ArrayList<Byte> sendPayload) throws IOException {
+        // System.out.println(sendPayload.toString());
         outputStream.write(toPrimitives(sendPayload.toArray()));
         outputStream.flush();
     }
@@ -133,6 +132,7 @@ public class Server {
     }
 
     public void PKT_CALC(Socket socket, ArrayList<Integer> data) throws IOException {
+        // System.out.println(data.size());
         write(socket, 1, data.size(), data);
     }
 
@@ -152,11 +152,13 @@ public class Server {
         } else {
             int len = fromByteArray(lenByte);
             ArrayList<Integer> payloadData = new ArrayList<>();
-            for (int i = 0; i < len / 4; i++) {
-                byte[] tg = Arrays.copyOfRange(payload, 8 + i, 12 + i);
+            for (int i = 8; i < len + 8; i += 4) {
+                byte[] tg = Arrays.copyOfRange(payload, i, i + 4);
                 payloadData.add(fromByteArray(tg));
             }
-            if (check(payloadData, res)) {
+            boolean bool = check(payloadData, res);
+            // System.out.println(bool);
+            if (bool) {
                 String flag = createFlag();
                 write(socket, 4, flag.length(), flag);
                 System.out.println(flag);
@@ -167,10 +169,13 @@ public class Server {
 
     }
 
+    /**
+     * 
+     */
     public void process() {
         ServerSocket sever = null;
         Socket socket = null;
-
+        QuickSort quickSort = new QuickSort();
         try {
             sever = new ServerSocket(Server.PORT);
 
@@ -181,17 +186,24 @@ public class Server {
             PKT_HELLO(socket);
 
             ArrayList<Integer> data = new ArrayList<>();
-            data.add(1);
-            data.add(1);
+
+            for (int i : quickSort.getMyArr()) {
+                data.add(i);
+            }
+
             PKT_CALC(socket, data);
 
+            quickSort.sort();
             data.clear();
-            data.add(2);
+
+            for (int i : quickSort.getMyArr()) {
+                data.add(i);
+            }
 
             PKT_RES(socket, data);
+            // System.out.println(data.toString());
 
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
             System.exit(1);
         }
