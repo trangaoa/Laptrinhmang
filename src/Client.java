@@ -62,7 +62,7 @@ public class Client {
     public void write(Socket socket, int type, int len, ArrayList<Integer> data) throws IOException {
         ArrayList<Byte> sendPayload = new ArrayList<>();
         addPayload(sendPayload, type);
-        addPayload(sendPayload, len * 4);
+        addPayload(sendPayload, len);
         for (int i = 0; i < len; i++) {
             addPayload(sendPayload, data.get(i));
         }
@@ -118,7 +118,7 @@ public class Client {
             socketOfClient = new Socket(SERVERHOST, PORT);
             String msv = "20020005";
             client.write(socketOfClient, 0, msv.length(), msv);
-            byte[] payload = new byte[500];
+            byte[] payload = new byte[100100];
             socketOfClient.getInputStream().read(payload);
             byte[] typeByte = new byte[4];
             byte[] lenByte = new byte[4];
@@ -129,12 +129,17 @@ public class Client {
             lenByte = Arrays.copyOfRange(payload, 4, 8);
             type = client.fromByteArray(typeByte);
             len = client.fromByteArray(lenByte);
-            // System.out.println(len);
+            System.out.println(len);
+            for (int i = 0; i < 8; i++) {
+                System.out.print(payload[i] + ", ");
+            }
+            System.out.println();
             // System.out.println("Payload: " + payload);
-            for (int i = 8; i < len + 8; i += 4) {
+            for (int i = 8; i < len * 4 + 8; i += 4) {
                 byte[] tg = Arrays.copyOfRange(payload, i, i + 4);
                 dataPayload.add(client.fromByteArray(tg));
             }
+            System.out.println(dataPayload.size());
             Collections.sort(dataPayload);
             // dataPayload.add(3);
             // System.out.println(dataPayload.toString());

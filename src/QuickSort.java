@@ -11,10 +11,13 @@ public class QuickSort {
 
     void RandomArr() {
         Random generator = new Random();
-        int value1 = generator.nextInt(100) + 10;
+        int value1 = generator.nextInt(16000) + 10;
+        // int value1 = 16000;
         myArr = new int[value1];
         for (int i = 0; i < value1; i++) {
-            myArr[i] = generator.nextInt(100000);
+            int tg = generator.nextInt();
+            myArr[i] = tg < 0 ? -tg : tg;
+
         }
     }
 

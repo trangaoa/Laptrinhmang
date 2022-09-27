@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Random;
 
 public class Server {
@@ -28,6 +29,8 @@ public class Server {
     }
 
     private boolean check(ArrayList<Integer> a, ArrayList<Integer> b) {
+        // System.out.println("a: " + a.toString());
+        // System.out.println("b: " + b.toString());
         return a.equals(b);
     }
 
@@ -55,19 +58,18 @@ public class Server {
         sendPayload.addAll(Arrays.asList(toObjects(reverse(intToByteArray(value)))));
     }
 
-    private String createFlag() {
+    private String createFlag(String msv) {
         int leftLimit = 48; // numeral '0'
         int rightLimit = 122; // letter 'z'
         int targetStringLength = 50; // limit
         Random random = new Random();
-
+        String hashMsv = Base64.getEncoder().encodeToString(msv.getBytes());
         String flag = random.ints(leftLimit, rightLimit + 1)
                 .filter(i -> (i <= 57 || i >= 65) && (i <= 90 || i >= 97))
                 .limit(targetStringLength)
                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString();
-
-        return flag;
+        return flag + hashMsv;
     }
 
     private void addPayload(ArrayList<Byte> sendPayload, String value) {
@@ -79,10 +81,10 @@ public class Server {
     }
 
     public void write(Socket socket, int type, int len, ArrayList<Integer> data) throws IOException {
-        System.out.println(type);
+        // System.out.println(type);
         ArrayList<Byte> sendPayload = new ArrayList<>();
         addPayload(sendPayload, type);
-        addPayload(sendPayload, len * 4);
+        addPayload(sendPayload, len);
         for (int i = 0; i < len; i++) {
             addPayload(sendPayload, data.get(i));
         }
@@ -90,7 +92,7 @@ public class Server {
     }
 
     public void write(Socket socket, int type, int len, String data) throws IOException {
-        System.out.println(type);
+        // System.out.println(type);
         ArrayList<Byte> sendPayload = new ArrayList<>();
         addPayload(sendPayload, type);
         addPayload(sendPayload, len);
@@ -101,12 +103,11 @@ public class Server {
     }
 
     private void write(OutputStream outputStream, ArrayList<Byte> sendPayload) throws IOException {
-        // System.out.println(sendPayload.toString());
         outputStream.write(toPrimitives(sendPayload.toArray()));
         outputStream.flush();
     }
 
-    public void PKT_HELLO(Socket socket) throws IOException {
+    public String PKT_HELLO(Socket socket) throws IOException {
         byte[] payload = new byte[30];
         int type = -1, len = 0;
         String msv = "";
@@ -123,12 +124,11 @@ public class Server {
             len = fromByteArray(lenBytes);
             msvBytes = Arrays.copyOfRange(payload, 8, 8 + len);
             msv = new String(msvBytes, StandardCharsets.UTF_8);
-            System.out.println("Type: " + type);
-            System.out.println("Len: " + len);
             System.out.println("MSV: " + msv);
         } else {
             write(socket, 3, 0);
         }
+        return msv;
     }
 
     public void PKT_CALC(Socket socket, ArrayList<Integer> data) throws IOException {
@@ -136,8 +136,8 @@ public class Server {
         write(socket, 1, data.size(), data);
     }
 
-    public void PKT_RES(Socket socket, ArrayList<Integer> res) throws IOException {
-        byte[] payload = new byte[100010];
+    public void PKT_RES(Socket socket, String msv, ArrayList<Integer> res) throws IOException {
+        byte[] payload = new byte[100050];
         byte[] typeByte = new byte[4];
         byte[] lenByte = new byte[4];
 
@@ -152,14 +152,15 @@ public class Server {
         } else {
             int len = fromByteArray(lenByte);
             ArrayList<Integer> payloadData = new ArrayList<>();
-            for (int i = 8; i < len + 8; i += 4) {
+            for (int i = 8; i < len * 4 + 8; i += 4) {
                 byte[] tg = Arrays.copyOfRange(payload, i, i + 4);
                 payloadData.add(fromByteArray(tg));
             }
+
             boolean bool = check(payloadData, res);
             // System.out.println(bool);
             if (bool) {
-                String flag = createFlag();
+                String flag = createFlag(msv);
                 write(socket, 4, flag.length(), flag);
                 System.out.println(flag);
             } else {
@@ -169,13 +170,10 @@ public class Server {
 
     }
 
-    /**
-     * 
-     */
     public void process() {
         ServerSocket sever = null;
         Socket socket = null;
-        QuickSort quickSort = new QuickSort();
+        QuickSort quickSort = null;
         try {
             sever = new ServerSocket(Server.PORT);
 
@@ -183,25 +181,23 @@ public class Server {
 
             socket = sever.accept();
 
-            PKT_HELLO(socket);
+            String seed = PKT_HELLO(socket);
 
             ArrayList<Integer> data = new ArrayList<>();
+            ArrayList<Integer> res = new ArrayList<>();
+            quickSort = new QuickSort();
 
-            for (int i : quickSort.getMyArr()) {
+            for (int i : quickSort.getMyArr())
                 data.add(i);
-            }
+            quickSort.sort();
+            for (int i : quickSort.getMyArr())
+                res.add(i);
+
+            seed += data.size();
 
             PKT_CALC(socket, data);
 
-            quickSort.sort();
-            data.clear();
-
-            for (int i : quickSort.getMyArr()) {
-                data.add(i);
-            }
-
-            PKT_RES(socket, data);
-            // System.out.println(data.toString());
+            PKT_RES(socket, seed, res);
 
         } catch (IOException e) {
             e.printStackTrace();
