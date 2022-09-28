@@ -22,9 +22,9 @@ public class CheckFibonacci {
     public static void main(String[] args) {
         CheckFibonacci checkFibonacci = new CheckFibonacci();
         System.out.println(Arrays.toString(checkFibonacci.getMyArr()));
-        int total = checkFibonacci.count(checkFibonacci.myArr);
+        int total = checkFibonacci.count();
         System.out.println("======================================");
-        System.out.println("Số lần xuất hiện các số Fibonacci trong dãy là: " + total);
+        System.out.println(total);
     }
 
     public int[] getMyArr() {
@@ -42,8 +42,12 @@ public class CheckFibonacci {
         }
         System.out.println();
     }
+    
+    public int count() {
+        return countFibonacci(myArr);
+    }
 
-    public int count(int arr[]) {
+    int countFibonacci(int arr[]) {
         int n = arr.length;
         int amount = 0;
 
