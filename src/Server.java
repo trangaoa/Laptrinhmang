@@ -205,6 +205,41 @@ public class Server {
         }
     }
 
+    public void processFibonacci() {
+        ServerSocket sever = null;
+        Socket socket = null;
+        CheckFibonacci checkFibonacci = null;
+        try {
+            sever = new ServerSocket(Server.PORT);
+
+            System.out.println("Waiting for new connection....");
+
+            socket = sever.accept();
+
+            String seed = PKT_HELLO(socket);
+
+            ArrayList<Integer> data = new ArrayList<>();
+            ArrayList<Integer> res = new ArrayList<>();
+            checkFibonacci = new CheckFibonacci();
+
+            for (int i : checkFibonacci.getMyArr())
+                data.add(i);
+                checkFibonacci.count();
+            for (int i : checkFibonacci.getMyArr())
+                res.add(i);
+
+            seed += data.size();
+
+            PKT_CALC(socket, data);
+
+            PKT_RES(socket, seed, res);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
     public static void main(String[] args) {
         Server server = new Server();
         server.process();
